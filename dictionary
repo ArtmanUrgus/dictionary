@@ -1,0 +1,629 @@
+#pragma once
+
+#include <iostream>
+#include <string>
+#include <map>
+#include <set>
+#include <vector>
+
+using namespace std;
+
+template <typename T>
+class Node
+{
+    public:
+        Node();
+        Node( Node<T>* );
+        ~Node();
+
+        Node<T>* addLiteral( const char& );
+        bool hasLiteral( const char& );
+
+        Node<T>* child( const char& );
+        bool hasChildren();
+
+        Node<T>* getParent();
+
+        T getData();
+        void setData( T );
+        bool hasData();
+
+        set<string> getKey();
+
+        void removeKey();
+        void removeFromMap( const char& );
+        void destroy();
+
+    private:
+        Node<T>* parent = nullptr;
+        map<char, Node<T>*> keyMap;
+        T data;
+        bool key = false;
+};
+
+template <typename T>
+inline Node<T>::Node()
+{
+}
+
+template<typename T>
+inline Node<T>::Node( Node<T>* p ) : parent( p )
+{
+}
+
+template <typename T>
+inline Node<T>::~Node()
+{
+}
+
+template<typename T>
+inline Node<T>* Node<T>::addLiteral( const char& lit )
+{
+    Node<T>* node = new Node<T>( this );
+    keyMap[lit] = node;
+
+    return keyMap[lit];
+}
+
+template <typename T>
+inline T Node<T>::getData()
+{
+    return data;
+}
+
+template <typename T>
+inline void Node<T>::setData( T d )
+{
+    data = d;
+    key = true;
+}
+
+template<typename T>
+inline bool Node<T>::hasData()
+{
+    return key;
+}
+
+template<typename T>
+inline set<string> Node<T>::getKey()
+{
+    set<string> list;
+
+    if( !keyMap.empty() )
+    {
+        for( const auto& keyPair : keyMap )
+        {
+            Node<T>* node = nullptr;
+            node = keyPair.second;
+
+            if( node->hasChildren() )
+            {
+                set<string> subList = node->getKey();
+
+                for( const string& subKey : subList )
+                {
+                    string s;
+                    s.append( sizeof( char ), keyPair.first );
+
+                    if( node->hasData() )
+                    {
+                        if( list.find( s ) == list.end() )
+                        {
+                            list.insert( s );
+                        }
+                    }
+
+                    s.append( subKey );
+
+                    list.insert( s );
+                }
+            }
+        }
+
+        if( list.size() )
+        {
+            return list;
+        }
+
+        for( const auto& keyPair : keyMap )
+        {
+            string s;
+            s.append( sizeof( char ), keyPair.first );
+
+            list.insert( s );
+        }
+
+    }
+
+    return list;
+}
+
+template<typename T>
+inline void Node<T>::removeKey()
+{
+    key = false;
+}
+
+template<typename T>
+inline void Node<T>::removeFromMap( const char& lit )
+{
+    if( keyMap.find( lit ) != keyMap.end() )
+    {
+        keyMap.erase( lit );
+    }
+}
+
+template<typename T>
+inline void Node<T>::destroy()
+{
+    for( const auto& keyPair : keyMap )
+    {
+        Node<T>* node = keyPair.second;
+
+        if( !node->hasChildren() )
+        {
+            delete node;
+            node = nullptr;
+        }
+        else
+        {
+            node->destroy();
+        }
+    }
+}
+
+template <typename T>
+inline bool Node<T>::hasLiteral( const char& lit )
+{
+    if( keyMap.find( lit ) != keyMap.end() )
+    {
+        return true;
+    }
+
+    return false;
+}
+
+template<typename T>
+inline bool Node<T>::hasChildren()
+{
+    return !keyMap.empty();
+}
+
+template<typename T>
+inline Node<T>* Node<T>::getParent()
+{
+    return parent;
+}
+
+template<typename T>
+inline Node<T>* Node<T>::child( const char& lit )
+{
+    return keyMap[lit];
+}
+
+template <typename T>
+class dictionary
+{
+    public:
+        dictionary();
+        ~dictionary();
+
+        bool empty();
+        bool insert( const string&, const T& );
+        bool find( const string& );
+        vector<string> keys();
+        map<string, T> values();
+        T value( const string& ) const;
+        bool setValue( const string&, const T& );
+        bool remove( const string& );
+        bool replace( const string&, const string& );
+        void clear();
+
+        const T operator []( const string& key ) const;
+
+    private:
+        mutable map<char, Node<T>*> root;
+};
+
+template <typename T>
+inline dictionary<T>::dictionary()
+{
+}
+
+template <typename T>
+inline dictionary<T>::~dictionary()
+{
+    cout << "DISTRUCTOR ";
+    clear();
+}
+
+inline template<typename T>
+bool dictionary<T>::empty()
+{
+    return root.empty();
+}
+
+template <typename T>
+inline const T dictionary<T>::operator []( const string& key ) const
+{
+    return value( key );
+}
+
+template <typename T>
+inline bool dictionary<T>::insert( const string& k, const T& data )
+{
+    if( !k.empty() )
+    {
+        string key = k;
+        Node<T>* node = nullptr;
+        auto rootLiteral = key.at( 0 );
+
+        if( root.find( rootLiteral ) == root.end() )
+        {
+            node = new Node<T>();
+
+            root[rootLiteral] = node;
+            key.erase( 0, 1 );
+
+            if( key.size() == 0 )
+            {
+                node->setData( data );
+            }
+        }
+        else
+        {
+            node = root[rootLiteral];
+            key.erase( 0, 1 );
+
+            while( node->hasLiteral( key.at( 0 ) ) )
+            {
+                node = node->child( key.at( 0 ) );
+                key.erase( 0, 1 );
+
+                if( key.size() == 0 )
+                {
+                    node->setData( data );
+                    return true;
+                }
+            }
+        }
+
+        if( key.size() )
+        {
+            do
+            {
+                node = node->addLiteral( key.at( 0 ) );
+
+                key.erase( 0, 1 );
+            }
+            while( key.size() );
+
+            node->setData( data );
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template<typename T>
+inline bool dictionary<T>::find( const string& k )
+{
+    if( !root.empty() && !k.empty() )
+    {
+        string key = k;
+        Node<T>* node = nullptr;
+        auto rootLiteral = key.at( 0 );
+
+        if( root.find( rootLiteral ) != root.end() )
+        {
+            node = root[rootLiteral];
+            key.erase( 0, 1 );
+
+            if( key.empty() )
+            {
+                return node->hasData();
+            }
+
+            while( node->hasLiteral( key.at( 0 ) ) )
+            {
+                node = node->child( key.at( 0 ) );
+                key.erase( 0, 1 );
+
+                if( key.empty() )
+                {
+                    return node->hasData();
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+template<typename T>
+inline vector<string> dictionary<T>::keys()
+{
+    vector<string> list;
+
+    if( !root.empty() )
+    {
+        for( const auto& myPair : root )
+        {
+            Node<T>* node = nullptr;
+            node = myPair.second;
+
+            set<string> subList = node->getKey( );
+
+            for( const string& subKey : subList )
+            {
+                string s;
+                s.append( sizeof( char ), myPair.first );
+                s.append( subKey );
+
+                list.push_back( s );
+            }
+
+            if( node->hasData() )
+            {
+                string s;
+                s.append( sizeof( char ), myPair.first );
+                list.push_back( s );
+            }
+        }
+    }
+
+    return list;
+}
+
+template<typename T>
+inline map<string, T> dictionary<T>::values()
+{
+    map<string, T> keyDataMap;
+
+    if( !root.empty() )
+    {
+        vector<string> list = keys();
+
+        for( const string& key : list )
+        {
+            keyDataMap[key] = value( key );
+        }
+    }
+
+    return keyDataMap;
+}
+
+template<typename T>
+inline T dictionary<T>::value( const string& k ) const
+{
+    if( !root.empty() && !k.empty() )
+    {
+        string key = k;
+        Node<T>* node = nullptr;
+        auto rootLiteral = key.at( 0 );
+
+        if( root.find( rootLiteral ) != root.end() )
+        {
+            node = root[rootLiteral];
+            key.erase( 0, 1 );
+
+            if( key.empty() && node->hasData() )
+            {
+                return node->getData();
+            }
+            else if( key.empty() )
+            {
+                return T();
+            }
+
+            while( node->hasLiteral( key.at( 0 ) ) )
+            {
+                node = node->child( key.at( 0 ) );
+                key.erase( 0, 1 );
+
+                if( key.empty() && node->hasData() )
+                {
+                    return node->getData();
+                }
+                else if( key.empty() )
+                {
+                    return T();
+                }
+            }
+        }
+    }
+
+    return T();
+}
+
+template<typename T>
+inline bool dictionary<T>::setValue( const string& k, const T& data )
+{
+    if( !root.empty() && !k.empty() )
+    {
+        if( find( k ) )
+        {
+            string key = k;
+            Node<T>* node = nullptr;
+            auto rootLiteral = key.at( 0 );
+
+            if( root.find( rootLiteral ) != root.end() )
+            {
+                node = root[rootLiteral];
+                key.erase( 0, 1 );
+
+                if( key.empty() )
+                {
+                    if( node->hasData() )
+                    {
+                        node->setData( data );
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                while( node->hasLiteral( key.at( 0 ) ) )
+                {
+                    node = node->child( key.at( 0 ) );
+                    key.erase( 0, 1 );
+
+                    if( key.empty() )
+                    {
+                        if( node->hasData() )
+                        {
+                            node->setData( data );
+                            return true;
+                        }
+
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template<typename T>
+inline bool dictionary<T>::remove( const string& k )
+{
+    if( !root.empty() && !k.empty() )
+    {
+        string key = k;
+
+        if( find( key ) )
+        {
+            Node<T>* node = nullptr;
+            auto rootLiteral = key.at( 0 );
+
+            if( root.find( rootLiteral ) != root.end() )
+            {
+                node = root[rootLiteral];
+                key.erase( 0, 1 );
+
+                if( key.empty() && node->hasData() )
+                {
+                    if( node->hasChildren() )
+                    {
+                        node->removeKey();
+                    }
+                    else
+                    {
+                        key = k;
+
+                        do
+                        {
+                            Node<T>* prnt = node->getParent();
+                            delete node;
+                            node = nullptr;
+
+                            char lit = key.at( key.size() - 1 );
+                            key.erase( key.size() - 1, 1 );
+
+                            if( prnt != nullptr )
+                            {
+                                node = prnt;
+                                node->removeFromMap( lit );
+                            }
+                            else
+                            {
+                                root.erase( lit );
+                                return true;
+                            }
+                        }
+                        while( !node->hasData() && !node->hasChildren() );
+                    }
+
+                    return true;
+                }
+
+                while( node->hasLiteral( key.at( 0 ) ) )
+                {
+                    node = node->child( key.at( 0 ) );
+                    key.erase( 0, 1 );
+
+                    if( key.empty() && node->hasData() )
+                    {
+                        if( node->hasChildren() )
+                        {
+                            node->removeKey();
+                        }
+                        else
+                        {
+                            key = k;
+
+                            do
+                            {
+                                Node<T>* prnt = node->getParent();
+                                delete node;
+                                node = nullptr;
+
+                                char lit = key.at( key.size() - 1 );
+                                key.erase( key.size() - 1, 1 );
+
+                                if( prnt != nullptr )
+                                {
+                                    node = prnt;
+                                    node->removeFromMap( lit );
+                                }
+                                else
+                                {
+                                    root.erase( lit );
+                                    return true;
+                                }
+                            }
+                            while( !node->hasData() && !node->hasChildren() );
+                        }
+
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+template<typename T>
+inline bool dictionary<T>::replace( const string& oldKey, const string& newKey )
+{
+    if( !oldKey.empty() && !newKey.empty() )
+    {
+        if( oldKey != newKey )
+        {
+            if( find( oldKey ) )
+            {
+                T d = value( oldKey );
+                insert( newKey, d );
+                remove( oldKey );
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+template<typename T>
+inline void dictionary<T>::clear()
+{
+    cout << "CLEAR" << endl;
+    Node<T>* node = nullptr;
+
+    for( const auto& keyPair : root )
+    {
+        node = keyPair.second;
+        node->destroy();
+        delete node;
+        node = nullptr;
+    }
+
+    root.clear();
+}
